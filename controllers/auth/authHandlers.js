@@ -1,122 +1,18 @@
-// controllers/authController.js
-const User = require("../models/User");
-const Board = require("../models/Board");
-const Column = require("../models/Column");
-const Card = require("../models/Card");
+// controllers/auth/authHandlers.js
+const User = require("../../models/User");
+const Board = require("../../models/Board");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
-const nodemailer = require("nodemailer");
-
-// ============= EMAIL TRANSPORTER SETUP (OPTIMIZED FOR SPEED) =============
-const transporter = nodemailer.createTransport({
-  service: "gmail",
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS,
-  },
-  pool: true,
-  maxConnections: 5,
-  maxMessages: 100,
-});
-
-transporter.verify((error, success) => {
-  if (error) {
-    console.error("❌ Email transporter error:", error);
-  } else {
-    console.log("✅ Email server ready to send messages");
-  }
-});
-
-// ============= HELPER FUNCTIONS =============
-const createInitialColumns = async (boardId, defaultColumns) => {
-  console.log("🛠 Creating initial columns for board:", boardId);
-  const columnDocs = defaultColumns.map((col, index) => ({
-    title: col.title,
-    board: boardId,
-    position: index,
-  }));
-  const columns = await Column.insertMany(columnDocs);
-  console.log(
-    "✅ Columns created:",
-    columns.map((c) => c._id),
-  );
-  return columns.map((col) => col._id);
-};
-
-const getPopulatedBoardsForUser = async (userId) => {
-  console.log("🛠 Fetching populated boards for user:", userId);
-  const boards = await Board.find({ owner: userId })
-    .populate("owner", "name email")
-    .sort("-lastActivity")
-    .lean();
-
-  const populatedBoards = await Promise.all(
-    boards.map(async (board) => {
-      const columns = await Column.find({
-        _id: { $in: board.columnOrder },
-      }).lean();
-      const columnsWithCards = await Promise.all(
-        columns.map(async (column) => {
-          const cards = await Card.find({ column: column._id })
-            .sort("position")
-            .lean();
-          return { ...column, cards };
-        }),
-      );
-      const sortedColumns = board.columnOrder
-        .map((colId) => columnsWithCards.find((col) => col._id.equals(colId)))
-        .filter((col) => col);
-      return { ...board, columns: sortedColumns };
-    }),
-  );
-  console.log("✅ Boards fetched for user:", userId);
-  return populatedBoards;
-};
-
-// ============= SEND EMAIL FUNCTION =============
-const sendEmail = async (to, subject, html) => {
-  console.log("📧 Sending email to:", to, "Subject:", subject);
-  try {
-    const info = await transporter.sendMail({
-      from: `"Trello Clone" <${process.env.EMAIL_USER}>`,
-      to,
-      subject,
-      html,
-    });
-    console.log("✅ Email sent:", info.messageId);
-    return true;
-  } catch (error) {
-    console.error("❌ Email send error:", error);
-    return false;
-  }
-};
-
-// ============= TEST FUNCTIONS =============
-const test = (req, res) => {
-  console.log("🔹 Test API called");
-  res.send("API is working!");
-};
-
-const createTestUser = async (req, res) => {
-  console.log("🔹 createTestUser called");
-  try {
-    const user = await User.create({
-      name: "Test User",
-      email: "test@example.com",
-      password: await bcrypt.hash("123456", 10),
-    });
-    console.log("✅ Test user created:", user._id);
-    res.json({ success: true, user });
-  } catch (error) {
-    console.error("❌ createTestUser error:", error);
-    res.status(500).json({ success: false, message: "Server error" });
-  }
-};
+const {
+  createInitialColumns,
+  getPopulatedBoardsForUser,
+} = require("./helpers");
+const { sendEmail } = require("./emailService");
 
 // ============= REGISTER =============
 const register = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, boardName, boardColor } = req.body;
     console.log("🔥 Register API called for email:", email);
 
     if (!name || !email || !password) {
@@ -160,9 +56,10 @@ const register = async (req, res) => {
       { title: "Another Column", position: 3 },
     ];
 
+    // ✅ FIX: boardName aur boardColor ab req.body se aayega, agar nahi diya toh default use hoga
     const board = await Board.create({
-      name: "Getting Started",
-      color: "#0079BF",
+      name: boardName || "Getting Started",
+      color: boardColor || "#0079BF",
       description: "Your first board with 4 columns!",
       isPublic: false,
       owner: user._id,
@@ -195,7 +92,7 @@ const register = async (req, res) => {
 // ============= LOGIN =============
 const login = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, boardName, boardColor } = req.body;
     console.log("🔥 Login API called for email:", email);
 
     if (!email || !password) {
@@ -252,9 +149,10 @@ const login = async (req, res) => {
         { title: "Another Column", position: 3 },
       ];
 
+      // ✅ FIX: boardName aur boardColor ab req.body se aayega, agar nahi diya toh default use hoga
       const board = await Board.create({
-        name: "Getting Started",
-        color: "#0079BF",
+        name: boardName || "Getting Started",
+        color: boardColor || "#0079BF",
         description: "Your first board with 4 columns!",
         isPublic: false,
         owner: user._id,
@@ -427,74 +325,11 @@ const resetPassword = async (req, res) => {
   }
 };
 
-// ============= PROFILE FUNCTIONS =============
-const getProfile = async (req, res) => {
-  try {
-    console.log("🔥 getProfile called for user:", req.user.id);
-    const user = await User.findById(req.user.id).select(
-      "-password -otp -otpExpiry",
-    );
-    if (!user)
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
-    res.json({ success: true, user });
-  } catch (error) {
-    console.error("❌ getProfile error:", error);
-    res.status(500).json({ success: false, message: "Server error" });
-  }
-};
-
-const updateProfile = async (req, res) => {
-  try {
-    console.log("🔥 updateProfile called for user:", req.user.id);
-    const { name, email } = req.body;
-    const user = await User.findByIdAndUpdate(
-      req.user.id,
-      { name, email },
-      { new: true },
-    ).select("-password -otp -otpExpiry");
-    res.json({ success: true, user, message: "Profile updated successfully" });
-  } catch (error) {
-    console.error("❌ updateProfile error:", error);
-    res.status(500).json({ success: false, message: "Server error" });
-  }
-};
-
-const changePassword = async (req, res) => {
-  try {
-    console.log("🔥 changePassword called for user:", req.user.id);
-    const { currentPassword, newPassword } = req.body;
-    const user = await User.findById(req.user.id);
-
-    const isMatch = await bcrypt.compare(currentPassword, user.password);
-    if (!isMatch)
-      return res
-        .status(400)
-        .json({ success: false, message: "Current password is incorrect" });
-
-    user.password = await bcrypt.hash(newPassword, 10);
-    await user.save();
-
-    console.log("✅ Password changed successfully for user:", req.user.id);
-    res.json({ success: true, message: "Password changed successfully" });
-  } catch (error) {
-    console.error("❌ changePassword error:", error);
-    res.status(500).json({ success: false, message: "Server error" });
-  }
-};
-
-// ============= EXPORTS =============
 module.exports = {
-  test,
-  createTestUser,
   register,
   login,
   logout,
-  verifyOTP,
   forgotPassword,
+  verifyOTP,
   resetPassword,
-  getProfile,
-  updateProfile,
-  changePassword,
 };

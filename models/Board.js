@@ -1,5 +1,26 @@
 const mongoose = require("mongoose");
 
+// ------------------------
+// Simple BoardSchema (from your first code)
+// ------------------------
+const SimpleBoardSchema = new mongoose.Schema(
+  {
+    name: {
+      type: String,
+      required: [true, "Board name is required"],
+      trim: true,
+    },
+    color: {
+      type: String,
+      default: "#0079BF", // default Trello blue
+    },
+  },
+  { timestamps: true },
+);
+
+// ------------------------
+// Existing Complex boardSchema
+// ------------------------
 const boardSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true, maxlength: 100 },
@@ -159,6 +180,12 @@ boardSchema.pre("findOneAndDelete", async function (next) {
   }
 });
 
+// ------------------------
+// Export Both Schemas
+// ------------------------
 const Board = mongoose.models.Board || mongoose.model("Board", boardSchema);
+const SimpleBoard =
+  mongoose.models.SimpleBoard ||
+  mongoose.model("SimpleBoard", SimpleBoardSchema);
 
-module.exports = Board;
+module.exports = { Board, SimpleBoard };

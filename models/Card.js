@@ -1,5 +1,31 @@
 const mongoose = require("mongoose");
 
+// ------------------------
+// Simple CardSchema (from your first code)
+// ------------------------
+const SimpleCardSchema = new mongoose.Schema(
+  {
+    title: {
+      type: String,
+      required: [true, "Card title is required"],
+      trim: true,
+    },
+    list: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "List",
+      required: true,
+    },
+    position: {
+      type: Number,
+      default: 0,
+    },
+  },
+  { timestamps: true },
+);
+
+// ------------------------
+// Existing Complex cardSchema
+// ------------------------
 const cardSchema = new mongoose.Schema(
   {
     text: { type: String, required: true, trim: true, maxlength: 1000 },
@@ -176,5 +202,7 @@ cardSchema.virtual("daysUntilDue").get(function () {
 // Prevent OverwriteModelError
 // ------------------------
 const Card = mongoose.models.Card || mongoose.model("Card", cardSchema);
+const SimpleCard =
+  mongoose.models.SimpleCard || mongoose.model("SimpleCard", SimpleCardSchema);
 
-module.exports = Card;
+module.exports = { Card, SimpleCard };

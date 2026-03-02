@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const columnController = require("../controllers/columnController");
+const columnController = require("../controllers/column/columnController");
 const auth = require("../middleware/auth");
 
 // Enhanced Logging Middleware
