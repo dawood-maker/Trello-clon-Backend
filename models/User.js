@@ -23,43 +23,64 @@ const userSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-// Instance method: Log user info
+// ------------------------
+// Instance Methods
+// ------------------------
 userSchema.methods.logInfo = function () {
-  console.log(
-    `User logInfo called: ${this._id}, name: ${this.name}, email: ${this.email}`,
-  );
+  console.log("=======================================");
+  console.log(`User.logInfo called`);
+  console.log(`ID: ${this._id}`);
+  console.log(`Name: ${this.name}`);
+  console.log(`Email: ${this.email}`);
+  console.log("=======================================\n");
 };
 
+// ------------------------
 // Pre-save middleware
+// ------------------------
 userSchema.pre("save", function (next) {
-  console.log(
-    `User pre-save triggered for user: ${this._id}, name: ${this.name}`,
-  );
+  console.log("=======================================");
+  console.log(`User pre-save triggered`);
+  console.log(`ID: ${this._id}, Name: ${this.name}, Email: ${this.email}`);
+  console.log("=======================================\n");
   next();
 });
 
-// Pre-update middleware (for findOneAndUpdate, updateOne)
+// ------------------------
+// Pre-update middleware
+// ------------------------
 userSchema.pre(["updateOne", "findOneAndUpdate"], function (next) {
-  console.log(
-    `User update triggered with filter:`,
-    this.getFilter(),
-    "update:",
-    this.getUpdate(),
-  );
+  console.log("=======================================");
+  console.log(`User update triggered`);
+  console.log("Filter:", this.getFilter());
+  console.log("Update:", this.getUpdate());
+  console.log("=======================================\n");
   next();
 });
 
+// ------------------------
 // Post-save middleware
+// ------------------------
 userSchema.post("save", function (doc) {
-  console.log(`User saved: ${doc._id}, name: ${doc.name}`);
+  console.log("=======================================");
+  console.log(`User saved`);
+  console.log(`ID: ${doc._id}, Name: ${doc.name}, Email: ${doc.email}`);
+  console.log("=======================================\n");
 });
 
+// ------------------------
 // Post-remove middleware
+// ------------------------
 userSchema.post("remove", function (doc) {
-  console.log(`User removed: ${doc._id}, name: ${doc.name}`);
+  console.log("=======================================");
+  console.log(`User removed`);
+  console.log(`ID: ${doc._id}, Name: ${doc.name}, Email: ${doc.email}`);
+  console.log("=======================================\n");
 });
 
+// ------------------------
 // Prevent OverwriteModelError
+// ------------------------
 const User = mongoose.models.User || mongoose.model("User", userSchema);
 
 module.exports = User;

@@ -51,9 +51,12 @@ boardSchema.virtual("columns", {
   foreignField: "board",
 });
 
-// Static: Find boards for a user
+// ------------------------
+// Static Methods
+// ------------------------
 boardSchema.statics.findByUser = async function (userId) {
-  console.log("Board.findByUser called for user:", userId);
+  console.log("=======================================");
+  console.log(`Board.findByUser called for user: ${userId}`);
   const result = await this.find({
     $or: [{ owner: userId }, { "members.user": userId }],
   })
@@ -64,28 +67,35 @@ boardSchema.statics.findByUser = async function (userId) {
       populate: { path: "cards", options: { sort: { position: 1 } } },
     })
     .sort("-lastActivity");
-  console.log("Board.findByUser result count:", result.length);
+  console.log(`Board.findByUser result count: ${result.length}`);
+  console.log("=======================================\n");
   return result;
 };
 
-// Method: Check if user is a member
+// ------------------------
+// Instance Methods
+// ------------------------
 boardSchema.methods.isMember = function (userId) {
-  console.log(`Checking if user ${userId} is a member of board ${this._id}`);
-  if (this.owner.toString() === userId.toString()) return true;
-  return this.members.some((m) => m.user.toString() === userId.toString());
+  console.log(`Checking membership: user ${userId} on board ${this._id}`);
+  const isOwner = this.owner.toString() === userId.toString();
+  const isMember = this.members.some(
+    (m) => m.user.toString() === userId.toString(),
+  );
+  console.log(`Membership check result: owner=${isOwner}, member=${isMember}`);
+  return isOwner || isMember;
 };
 
-// Method: Get user role
 boardSchema.methods.getUserRole = function (userId) {
   console.log(`Getting role for user ${userId} on board ${this._id}`);
   if (this.owner.toString() === userId.toString()) return "owner";
   const member = this.members.find(
     (m) => m.user.toString() === userId.toString(),
   );
-  return member ? member.role : null;
+  const role = member ? member.role : null;
+  console.log(`Role for user ${userId}: ${role}`);
+  return role;
 };
 
-// Method: Check permissions
 boardSchema.methods.hasPermission = function (userId, action) {
   const role = this.getUserRole(userId);
   console.log(
@@ -98,19 +108,20 @@ boardSchema.methods.hasPermission = function (userId, action) {
   return false;
 };
 
-// Pre-save hook
+// ------------------------
+// Hooks
+// ------------------------
 boardSchema.pre("save", function (next) {
-  console.log("Board pre-save hook triggered for board:", this._id);
+  console.log(`Board pre-save hook triggered for board: ${this._id}`);
   this.lastActivity = Date.now();
   next();
 });
 
-// Pre-deleteOne hook
 boardSchema.pre(
   "deleteOne",
   { document: true, query: false },
   async function (next) {
-    console.log("Board pre-deleteOne hook triggered for board:", this._id);
+    console.log(`Board pre-deleteOne hook triggered for board: ${this._id}`);
     try {
       const Column = mongoose.model("Column");
       const Card = mongoose.model("Card");
@@ -127,7 +138,6 @@ boardSchema.pre(
   },
 );
 
-// Pre-findOneAndDelete hook
 boardSchema.pre("findOneAndDelete", async function (next) {
   console.log("Board pre-findOneAndDelete hook triggered");
   try {

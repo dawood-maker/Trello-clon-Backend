@@ -2,22 +2,29 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
 const auth = async (req, res, next) => {
+  console.log("=======================================");
+  console.log("🔥 Auth middleware triggered");
+  console.log(`Request URL: ${req.method} ${req.originalUrl}`);
+  console.log("Cookies:", req.cookies);
+  console.log("Authorization header:", req.header("Authorization"));
+  console.log("=======================================\n");
+
   try {
     let token;
 
     // ✅ Try to get token from cookie FIRST
     if (req.cookies && req.cookies.token) {
       token = req.cookies.token;
-      console.log("🔥 Auth: token found in cookie");
+      console.log("🔑 Auth: token found in cookie");
     }
     // Fallback: Authorization header
     else if (req.header("Authorization")) {
       token = req.header("Authorization").replace("Bearer ", "");
-      console.log("🔥 Auth: token found in Authorization header");
+      console.log("🔑 Auth: token found in Authorization header");
     }
 
     if (!token) {
-      console.log("⚠ Auth: no token provided");
+      console.warn("⚠ Auth: no token provided");
       return res.status(401).json({
         success: false,
         message: "Access denied. No token provided.",
@@ -27,9 +34,10 @@ const auth = async (req, res, next) => {
     // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     const userId = decoded.id || decoded.userId;
+    console.log("🔐 Auth: token decoded", { decoded });
 
     if (!userId) {
-      console.log("⚠ Auth: token decoded but userId missing");
+      console.warn("⚠ Auth: token decoded but userId missing");
       return res.status(401).json({
         success: false,
         message: "Invalid token format",
@@ -42,7 +50,7 @@ const auth = async (req, res, next) => {
     );
 
     if (!user) {
-      console.log("⚠ Auth: user not found for userId:", userId);
+      console.warn("⚠ Auth: user not found for userId:", userId);
       return res.status(401).json({
         success: false,
         message: "User not found. Token is invalid.",
@@ -59,14 +67,14 @@ const auth = async (req, res, next) => {
     console.log("✅ Auth: user authenticated successfully", {
       userId: req.user.id,
       email: req.user.email,
+      name: req.user.name,
     });
 
     next();
   } catch (error) {
     console.error("❌ Auth middleware error:", error.message);
-
     if (error.name === "JsonWebTokenError") {
-      console.log("⚠ Auth: invalid token detected");
+      console.warn("⚠ Auth: invalid token detected");
       return res.status(401).json({
         success: false,
         message: "Invalid token",
@@ -74,7 +82,7 @@ const auth = async (req, res, next) => {
     }
 
     if (error.name === "TokenExpiredError") {
-      console.log("⚠ Auth: token expired");
+      console.warn("⚠ Auth: token expired");
       return res.status(401).json({
         success: false,
         message: "Token expired. Please login again.",

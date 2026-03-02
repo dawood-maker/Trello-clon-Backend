@@ -4,40 +4,58 @@ const Column = require("../models/Column");
 const Card = require("../models/Card");
 const path = require("path");
 
-// ✅ Load .env from correct path
+// Load .env
 require("dotenv").config({ path: path.join(__dirname, "../.env") });
 
 async function fixData() {
+  console.log("=======================================");
+  console.log("🚀 Starting Data Fix Script...");
+  console.log("=======================================\n");
+
   try {
-    // ✅ Use MONGODB_URI instead of MONGO_URI
     const mongoURI = process.env.MONGODB_URI || process.env.MONGO_URI;
 
+    console.log("🔍 Checking MongoDB URI...");
     if (!mongoURI) {
       console.error("❌ MONGODB_URI not found in .env file!");
       process.exit(1);
     }
 
-    await mongoose.connect(mongoURI);
-    console.log("✅ MongoDB Connected");
+    console.log("✅ MongoDB URI Found");
+    console.log("🔗 Connecting to MongoDB...\n");
 
-    // Find all boards
+    await mongoose.connect(mongoURI);
+    console.log("✅ MongoDB Connected Successfully!\n");
+
+    // Fetch all boards
     const boards = await Board.find({});
-    console.log(`📋 Found ${boards.length} boards`);
+    console.log(`📋 Total Boards Found: ${boards.length}\n`);
+
+    let totalColumnsFixed = 0;
+    let totalCardsFixed = 0;
 
     for (const board of boards) {
       const ownerId = board.owner;
-      console.log(`\n🔧 Fixing board: ${board.name} (Owner: ${ownerId})`);
 
-      // Fix columns
-      const columns = await Column.find({
+      console.log("=======================================");
+      console.log(`🔧 Processing Board: ${board.name}`);
+      console.log(`🆔 Board ID: ${board._id}`);
+      console.log(`👤 Owner ID: ${ownerId}`);
+      console.log("=======================================\n");
+
+      // ------------------------
+      // Fix Columns
+      // ------------------------
+      const columnsToFix = await Column.find({
         board: board._id,
         $or: [{ owner: { $exists: false } }, { owner: null }],
       });
-      console.log(`  ⚡ Columns to fix: ${columns.length}`);
 
-      for (const column of columns) {
-        console.log(`    - Fixing column: ${column.title} (${column._id})`);
-      }
+      console.log(`⚡ Columns Missing Owner: ${columnsToFix.length}`);
+
+      columnsToFix.forEach((column) => {
+        console.log(`   ➤ Column: ${column.title} | ID: ${column._id}`);
+      });
 
       const columnsUpdated = await Column.updateMany(
         {
@@ -51,18 +69,23 @@ async function fixData() {
           },
         },
       );
-      console.log(`  ✅ Updated ${columnsUpdated.modifiedCount} columns`);
 
-      // Fix cards
-      const cards = await Card.find({
+      console.log(`✅ Columns Updated: ${columnsUpdated.modifiedCount}\n`);
+      totalColumnsFixed += columnsUpdated.modifiedCount;
+
+      // ------------------------
+      // Fix Cards
+      // ------------------------
+      const cardsToFix = await Card.find({
         board: board._id,
         $or: [{ owner: { $exists: false } }, { owner: null }],
       });
-      console.log(`  ⚡ Cards to fix: ${cards.length}`);
 
-      for (const card of cards) {
-        console.log(`    - Fixing card: ${card.text} (${card._id})`);
-      }
+      console.log(`⚡ Cards Missing Owner: ${cardsToFix.length}`);
+
+      cardsToFix.forEach((card) => {
+        console.log(`   ➤ Card: ${card.text} | ID: ${card._id}`);
+      });
 
       const cardsUpdated = await Card.updateMany(
         {
@@ -76,16 +99,26 @@ async function fixData() {
           },
         },
       );
-      console.log(`  ✅ Updated ${cardsUpdated.modifiedCount} cards`);
+
+      console.log(`✅ Cards Updated: ${cardsUpdated.modifiedCount}\n`);
+      totalCardsFixed += cardsUpdated.modifiedCount;
     }
 
-    console.log("\n🎉 All data fixed successfully!");
-    console.log(
-      "✅ Now each user has separate ownership for boards, columns, and cards!",
-    );
+    console.log("=======================================");
+    console.log("🎉 DATA FIX COMPLETED SUCCESSFULLY!");
+    console.log("=======================================");
+    console.log(`🗂 Total Columns Fixed: ${totalColumnsFixed}`);
+    console.log(`📝 Total Cards Fixed: ${totalCardsFixed}`);
+    console.log("=======================================\n");
+
+    await mongoose.disconnect();
+    console.log("🔌 MongoDB Disconnected");
     process.exit(0);
   } catch (error) {
-    console.error("❌ Error:", error);
+    console.error("=======================================");
+    console.error("❌ ERROR OCCURRED DURING FIX:");
+    console.error(error);
+    console.error("=======================================");
     process.exit(1);
   }
 }

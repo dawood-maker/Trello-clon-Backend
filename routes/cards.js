@@ -3,14 +3,36 @@ const router = express.Router();
 const cardController = require("../controllers/cardController");
 const auth = require("../middleware/auth");
 
-// Middleware to log requests
+// Enhanced Logging Middleware
 const logRequest = (req, res, next) => {
-  console.log(`Incoming Card request: ${req.method} ${req.originalUrl}`);
+  console.log("=======================================");
+  console.log(`Incoming Card Request: ${req.method} ${req.originalUrl}`);
   console.log("Params:", req.params);
   console.log("Body:", req.body);
   console.log("Query:", req.query);
+
+  // Capture JSON response
+  const originalJson = res.json;
+  res.json = function (data) {
+    console.log("Response Status:", res.statusCode);
+    console.log("Response Body:", data);
+    console.log("=======================================");
+    return originalJson.call(this, data);
+  };
+
+  // Capture errors
+  res.on("finish", () => {
+    if (res.statusCode >= 400) {
+      console.error("Error Response Status:", res.statusCode);
+    }
+  });
+
   next();
 };
+
+// =======================
+// Card Routes
+// =======================
 
 // Create a new card
 router.post("/", logRequest, auth, cardController.createCard);
