@@ -56,7 +56,6 @@ const register = async (req, res) => {
       { title: "Another Column", position: 3 },
     ];
 
-    // ✅ FIX: boardName aur boardColor ab req.body se aayega, agar nahi diya toh default use hoga
     const board = await Board.create({
       name: boardName || "Getting Started",
       color: boardColor || "#0079BF",
@@ -149,7 +148,6 @@ const login = async (req, res) => {
         { title: "Another Column", position: 3 },
       ];
 
-      // ✅ FIX: boardName aur boardColor ab req.body se aayega, agar nahi diya toh default use hoga
       const board = await Board.create({
         name: boardName || "Getting Started",
         color: boardColor || "#0079BF",
@@ -213,16 +211,30 @@ const forgotPassword = async (req, res) => {
         .json({ success: false, message: "User not found" });
     }
 
-    // Generate OTP (do NOT log OTP itself)
+    // Generate 6-digit OTP
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    user.otp = otp;
-    user.otpExpiry = Date.now() + 2 * 60 * 1000;
+    console.log("🔑 OTP generated for user:", email);
+
+    // ✅ FIX: Use resetOTP field to match User model
+    user.resetOTP = otp;
+    user.otpExpiry = Date.now() + 2 * 60 * 1000; // 2 minutes
     await user.save();
 
+    // ✅ FIX: Include actual OTP in the email HTML
     const emailSent = await sendEmail(
       email,
       "🔐 Password Reset OTP - Trello Clone",
-      `<p>Your OTP has been sent.</p>`,
+      `
+      <div style="font-family: Arial, sans-serif; max-width: 500px; margin: auto; padding: 30px; border: 2px solid #0052CC; border-radius: 10px;">
+        <h2 style="color: #0052CC;">🔒 Password Reset OTP</h2>
+        <p>Aapka OTP code yeh hai:</p>
+        <div style="background: #f0f4ff; padding: 20px; text-align: center; border-radius: 8px; margin: 20px 0;">
+          <h1 style="color: #0052CC; font-size: 40px; letter-spacing: 10px; margin: 0;">${otp}</h1>
+        </div>
+        <p>⏰ Yeh OTP sirf <strong>2 minutes</strong> ke liye valid hai.</p>
+        <p style="color: #999; font-size: 12px;">Agar aapne request nahi ki toh ignore karein.</p>
+      </div>
+      `,
     );
 
     if (!emailSent) {
@@ -261,11 +273,12 @@ const verifyOTP = async (req, res) => {
         .status(404)
         .json({ success: false, message: "User not found" });
 
-    if (!user.otp || !user.otpExpiry)
+    // ✅ FIX: Check resetOTP field to match User model
+    if (!user.resetOTP || !user.otpExpiry)
       return res.status(400).json({ success: false, message: "No OTP found" });
 
     if (Date.now() > user.otpExpiry) {
-      user.otp = undefined;
+      user.resetOTP = undefined;
       user.otpExpiry = undefined;
       await user.save();
       return res
@@ -273,7 +286,8 @@ const verifyOTP = async (req, res) => {
         .json({ success: false, message: "OTP has expired" });
     }
 
-    if (user.otp !== otp)
+    // ✅ FIX: Compare resetOTP field
+    if (user.resetOTP !== otp)
       return res.status(400).json({ success: false, message: "Invalid OTP" });
 
     console.log("✅ OTP verified for user:", email);
@@ -305,15 +319,16 @@ const resetPassword = async (req, res) => {
         .status(404)
         .json({ success: false, message: "User not found" });
 
-    if (!user.otp || !user.otpExpiry)
+    // ✅ FIX: Use resetOTP field to match User model
+    if (!user.resetOTP || !user.otpExpiry)
       return res.status(400).json({ success: false, message: "No OTP found" });
     if (Date.now() > user.otpExpiry)
       return res.status(400).json({ success: false, message: "OTP expired" });
-    if (user.otp !== otp)
+    if (user.resetOTP !== otp)
       return res.status(400).json({ success: false, message: "Invalid OTP" });
 
     user.password = await bcrypt.hash(newPassword, 10);
-    user.otp = undefined;
+    user.resetOTP = undefined;
     user.otpExpiry = undefined;
     await user.save();
 

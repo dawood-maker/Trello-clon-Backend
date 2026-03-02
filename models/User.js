@@ -12,8 +12,8 @@ const userSchema = new mongoose.Schema(
     },
     password: { type: String, required: true, minlength: 6 },
 
-    // OTP fields
-    otp: { type: String, default: null },
+    // OTP fields (updated)
+    resetOTP: { type: String, default: null },
     otpExpiry: { type: Date, default: null },
 
     isVerified: { type: Boolean, default: true },
