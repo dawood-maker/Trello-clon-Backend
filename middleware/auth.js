@@ -2,79 +2,89 @@ const jwt = require("jsonwebtoken");
 const User = require("../models/User");
 
 const auth = async (req, res, next) => {
-  console.log("=======================================");
-  console.log("🔥 Auth middleware triggered");
-  console.log(`Request URL: ${req.method} ${req.originalUrl}`);
-  console.log("Cookies:", req.cookies);
-  console.log("Authorization header:", req.header("Authorization"));
-  console.log("=======================================\n");
-
   try {
     let token;
+    console.log("🔹 Auth middleware called");
 
-    // ✅ Try to get token from cookie FIRST
+    //=======================
+    //  Try to get token from cookie FIRST (your frontend uses cookies)
+    //=======================
     if (req.cookies && req.cookies.token) {
       token = req.cookies.token;
-      console.log("🔑 Auth: token found in cookie");
+      console.log(" Token found in cookies");
     }
-    // Fallback: Authorization header
+    //=======================
+    // Fallback: Try Authorization header (for API testing)
+    //=======================
     else if (req.header("Authorization")) {
       token = req.header("Authorization").replace("Bearer ", "");
-      console.log("🔑 Auth: token found in Authorization header");
+      console.log(" Token found in Authorization header");
     }
 
     if (!token) {
-      console.warn("⚠ Auth: no token provided");
+      console.log(" No token provided");
       return res.status(401).json({
         success: false,
         message: "Access denied. No token provided.",
       });
     }
 
+    //=======================
     // Verify token
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    const userId = decoded.id || decoded.userId;
-    console.log("🔐 Auth: token decoded", { decoded });
+    //=======================
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+      console.log(" Token verified successfully");
+    } catch (err) {
+      console.log(" Token verification failed:", err.message);
+      throw err; // Let outer catch handle response
+    }
 
+    //=======================
+    // Get userId from token
+    //=======================
+    const userId = decoded.id || decoded.userId;
     if (!userId) {
-      console.warn("⚠ Auth: token decoded but userId missing");
+      console.log(" Invalid token format, missing userId");
       return res.status(401).json({
         success: false,
         message: "Invalid token format",
       });
     }
+    console.log("🔹 Token belongs to userId:", userId);
 
+    //=======================
     // Find user (excluding sensitive fields)
+    //=======================
     const user = await User.findById(userId).select(
       "-password -otp -otpExpiry",
     );
-
     if (!user) {
-      console.warn("⚠ Auth: user not found for userId:", userId);
+      console.log(" User not found. Token is invalid");
       return res.status(401).json({
         success: false,
         message: "User not found. Token is invalid.",
       });
     }
+    console.log(" User found:", user.email);
 
-    // ✅ Attach safe user info to request
+    //=======================
+    //  Attach user to request
+    //=======================
     req.user = {
       id: user._id.toString(),
       email: user.email,
       name: user.name,
     };
-
-    console.log("✅ Auth: user authenticated successfully", {
-      userId: req.user.id,
-      email: req.user.email,
-      name: req.user.name,
-    });
+    console.log("🔹 req.user attached:", req.user);
 
     next();
   } catch (error) {
-    console.error("❌ Auth middleware error:", error.message);
+    console.error(" Auth middleware error:", error.message);
+
     if (error.name === "JsonWebTokenError") {
-      console.warn("⚠ Auth: invalid token detected");
+      console.log(" Invalid JWT token");
       return res.status(401).json({
         success: false,
         message: "Invalid token",
@@ -82,7 +92,7 @@ const auth = async (req, res, next) => {
     }
 
     if (error.name === "TokenExpiredError") {
-      console.warn("⚠ Auth: token expired");
+      console.log("⚠️ JWT token expired");
       return res.status(401).json({
         success: false,
         message: "Token expired. Please login again.",

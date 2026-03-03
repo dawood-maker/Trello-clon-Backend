@@ -1,36 +1,17 @@
 const express = require("express");
 const router = express.Router();
-const otpController = require("../controllers/otp/otpController");
+const otpController = require("../controllers/otpController");
 
-// Enhanced Logging Middleware
-const logRequest = (req, res, next) => {
-  console.log("=======================================");
-  console.log(`Incoming OTP Request: ${req.method} ${req.originalUrl}`);
-  console.log("Body:", req.body);
-  console.log("Query:", req.query);
+// @route   POST /send
+router.post("/send", (req, res, next) => {
+  console.log("[OTP Router] POST /send called with body:", req.body);
+  otpController.sendOTP(req, res, next);
+});
 
-  // Capture JSON response
-  const originalJson = res.json;
-  res.json = function (data) {
-    console.log("Response Status:", res.statusCode);
-    console.log("Response Body:", data);
-    console.log("=======================================");
-    return originalJson.call(this, data);
-  };
-
-  // Log error responses
-  res.on("finish", () => {
-    if (res.statusCode >= 400) {
-      console.error("Error Response Status:", res.statusCode);
-      console.log("=======================================");
-    }
-  });
-
-  next();
-};
-
-// OTP Routes
-router.post("/send", logRequest, otpController.sendOTP);
-router.post("/verify", logRequest, otpController.verifyOTP);
+// @route   POST /verify
+router.post("/verify", (req, res, next) => {
+  console.log("[OTP Router] POST /verify called with body:", req.body);
+  otpController.verifyOTP(req, res, next);
+});
 
 module.exports = router;

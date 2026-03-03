@@ -1,80 +1,111 @@
 const express = require("express");
 const router = express.Router();
-const columnController = require("../controllers/column/columnController");
+const columnController = require("../controllers/columnController");
 const auth = require("../middleware/auth");
 
-// Enhanced Logging Middleware
-const logRequest = (req, res, next) => {
-  console.log("=======================================");
-  console.log(`Incoming Column Request: ${req.method} ${req.originalUrl}`);
-  console.log("Params:", req.params);
-  console.log("Body:", req.body);
-  console.log("Query:", req.query);
+// @route   POST /api/columns
+router.post("/", auth, (req, res, next) => {
+  console.log(
+    "[Columns Router] POST / called by userId:",
+    req.user?.id,
+    "with body:",
+    req.body,
+  );
+  columnController.createColumn(req, res, next);
+});
 
-  // Capture JSON response
-  const originalJson = res.json;
-  res.json = function (data) {
-    console.log("Response Status:", res.statusCode);
-    console.log("Response Body:", data);
-    console.log("=======================================");
-    return originalJson.call(this, data);
-  };
+// @route   GET /api/columns/board/:boardId
+router.get("/board/:boardId", auth, (req, res, next) => {
+  console.log(
+    "[Columns Router] GET /board/:boardId called by userId:",
+    req.user?.id,
+    "boardId:",
+    req.params.boardId,
+  );
+  columnController.getColumnsByBoard(req, res, next);
+});
 
-  // Log error status codes
-  res.on("finish", () => {
-    if (res.statusCode >= 400) {
-      console.error("Error Response Status:", res.statusCode);
-      console.log("=======================================");
-    }
-  });
+// @route   GET /api/columns/:id
+router.get("/:id", auth, (req, res, next) => {
+  console.log(
+    "[Columns Router] GET /:id called by userId:",
+    req.user?.id,
+    "columnId:",
+    req.params.id,
+  );
+  columnController.getColumn(req, res, next);
+});
 
-  next();
-};
+// @route   PUT /api/columns/:id
+router.put("/:id", auth, (req, res, next) => {
+  console.log(
+    "[Columns Router] PUT /:id called by userId:",
+    req.user?.id,
+    "columnId:",
+    req.params.id,
+    "with body:",
+    req.body,
+  );
+  columnController.updateColumn(req, res, next);
+});
 
-// =======================
-// Column Routes
-// =======================
+// @route   DELETE /api/columns/:id
+router.delete("/:id", auth, (req, res, next) => {
+  console.log(
+    "[Columns Router] DELETE /:id called by userId:",
+    req.user?.id,
+    "columnId:",
+    req.params.id,
+  );
+  columnController.deleteColumn(req, res, next);
+});
 
-// Create a new column
-router.post("/", logRequest, auth, columnController.createColumn);
+// @route   PUT /api/columns/:id/position
+router.put("/:id/position", auth, (req, res, next) => {
+  console.log(
+    "[Columns Router] PUT /:id/position called by userId:",
+    req.user?.id,
+    "columnId:",
+    req.params.id,
+    "with body:",
+    req.body,
+  );
+  columnController.updateColumnPosition(req, res, next);
+});
 
-// Get columns by board
-router.get(
-  "/board/:boardId",
-  logRequest,
-  auth,
-  columnController.getColumnsByBoard,
-);
+// @route   PUT /api/columns/:id/move
+router.put("/:id/move", auth, (req, res, next) => {
+  console.log(
+    "[Columns Router] PUT /:id/move called by userId:",
+    req.user?.id,
+    "columnId:",
+    req.params.id,
+    "with body:",
+    req.body,
+  );
+  columnController.moveColumn(req, res, next);
+});
 
-// Get single column by ID
-router.get("/:id", logRequest, auth, columnController.getColumn);
+// @route   GET /api/columns/:id/stats
+router.get("/:id/stats", auth, (req, res, next) => {
+  console.log(
+    "[Columns Router] GET /:id/stats called by userId:",
+    req.user?.id,
+    "columnId:",
+    req.params.id,
+  );
+  columnController.getColumnStats(req, res, next);
+});
 
-// Update column
-router.put("/:id", logRequest, auth, columnController.updateColumn);
-
-// Delete column
-router.delete("/:id", logRequest, auth, columnController.deleteColumn);
-
-// Update column position
-router.put(
-  "/:id/position",
-  logRequest,
-  auth,
-  columnController.updateColumnPosition,
-);
-
-// Move column to different board
-router.put("/:id/move", logRequest, auth, columnController.moveColumn);
-
-// Get column statistics
-router.get("/:id/stats", logRequest, auth, columnController.getColumnStats);
-
-// Duplicate column
-router.post(
-  "/:id/duplicate",
-  logRequest,
-  auth,
-  columnController.duplicateColumn,
-);
+// @route   POST /api/columns/:id/duplicate
+router.post("/:id/duplicate", auth, (req, res, next) => {
+  console.log(
+    "[Columns Router] POST /:id/duplicate called by userId:",
+    req.user?.id,
+    "columnId:",
+    req.params.id,
+  );
+  columnController.duplicateColumn(req, res, next);
+});
 
 module.exports = router;

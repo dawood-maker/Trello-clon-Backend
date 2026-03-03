@@ -9,6 +9,7 @@ const columnSchema = new mongoose.Schema(
       ref: "Board",
       required: true,
     },
+    //🔥 owner is no longer required
     owner: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -36,120 +37,122 @@ const columnSchema = new mongoose.Schema(
   },
 );
 
-// ------------------------
 // Indexes
-// ------------------------
 columnSchema.index({ board: 1, owner: 1, position: 1 });
 columnSchema.index({ owner: 1 });
 
-// ------------------------
 // Virtual populate for cards
-// ------------------------
 columnSchema.virtual("cards", {
   ref: "Card",
   localField: "_id",
   foreignField: "column",
 });
 
-// ------------------------
-// Static Methods
-// ------------------------
+//========================================
+// Static method: Find columns by board and user
+//========================================
 columnSchema.statics.findByBoardAndUser = async function (boardId, userId) {
-  console.log("=======================================");
-  console.log("Column.findByBoardAndUser called:", { boardId, userId });
-  const result = await this.find({ board: boardId, owner: userId })
+  console.log(
+    `[Column] findByBoardAndUser called with boardId=${boardId}, userId=${userId}`,
+  );
+  return this.find({
+    board: boardId,
+    owner: userId,
+  })
     .populate({
       path: "cards",
       match: { owner: userId },
       options: { sort: { position: 1 } },
     })
     .sort("position");
-  console.log("Result count:", result.length);
-  console.log("=======================================\n");
-  return result;
 };
 
+//========================================
+// Static method: Count columns by board and user
+//========================================
 columnSchema.statics.countByBoardAndUser = async function (boardId, userId) {
-  console.log("Column.countByBoardAndUser called:", { boardId, userId });
-  const count = await this.countDocuments({ board: boardId, owner: userId });
-  console.log("Count:", count);
-  return count;
+  console.log(
+    `[Column] countByBoardAndUser called with boardId=${boardId}, userId=${userId}`,
+  );
+  return this.countDocuments({ board: boardId, owner: userId });
 };
 
-// ------------------------
-// Instance Methods
-// ------------------------
+//========================================
+// Instance method: Check ownership
+//========================================
 columnSchema.methods.isOwnedBy = function (userId) {
-  const result = this.owner?.toString() === userId.toString();
-  console.log(`Column.isOwnedBy: user ${userId} => ${result}`);
-  return result;
+  const owned = this.owner?.toString() === userId.toString();
+  console.log(`[Column] isOwnedBy check for userId=${userId}: ${owned}`);
+  return owned;
 };
 
-// ------------------------
-// Hooks
-// ------------------------
+//================================
+// Update lastActivity on save
+//================================
 columnSchema.pre("save", function (next) {
   this.lastActivity = Date.now();
-  console.log("Column pre-save triggered for column:", this._id);
+  console.log(
+    `[Column] Saving column with id=${this._id}, lastActivity updated`,
+  );
   next();
 });
 
+//================================
+// Delete cards when column is deleted
+//================================
 columnSchema.pre(
   "deleteOne",
   { document: true, query: false },
   async function (next) {
-    console.log("Column pre-deleteOne triggered for column:", this._id);
     try {
+      console.log(`[Column] deleteOne called for column id=${this._id}`);
       const Card = mongoose.model("Card");
-      const result = await Card.deleteMany({
+      await Card.deleteMany({
         column: this._id,
         owner: this.owner,
       });
-      console.log(
-        `Deleted ${result.deletedCount} cards for column ${this._id}`,
-      );
+      console.log(`[Column] Related cards deleted for column id=${this._id}`);
       next();
     } catch (error) {
-      console.error("Error in pre-deleteOne hook:", error);
       next(error);
     }
   },
 );
 
+//================================
+// Delete cards when using findOneAndDelete
+//================================
 columnSchema.pre("findOneAndDelete", async function (next) {
-  console.log("Column pre-findOneAndDelete triggered");
   try {
     const Card = mongoose.model("Card");
     const column = await this.model.findOne(this.getFilter());
     if (column) {
-      const result = await Card.deleteMany({
+      console.log(
+        `[Column] findOneAndDelete: deleting cards for column id=${column._id}`,
+      );
+      await Card.deleteMany({
         column: column._id,
         owner: column.owner,
       });
-      console.log(
-        `Deleted ${result.deletedCount} cards for column ${column._id}`,
-      );
     }
     next();
   } catch (error) {
-    console.error("Error in pre-findOneAndDelete hook:", error);
     next(error);
   }
 });
 
+//================================
+// Prevent deleteMany without owner
+//================================
 columnSchema.pre("deleteMany", async function (next) {
   const filter = this.getFilter();
+  console.log(`[Column] deleteMany called with filter:`, filter);
   if (!filter.owner) {
-    console.error("Column.deleteMany prevented: owner not specified");
+    console.log(`[Column] deleteMany blocked: owner not specified`);
     return next(new Error("Owner must be specified when deleting columns"));
   }
-  console.log("Column.deleteMany called with owner filter:", filter.owner);
   next();
 });
 
-// ------------------------
-// Prevent OverwriteModelError
-// ------------------------
 const Column = mongoose.models.Column || mongoose.model("Column", columnSchema);
-
 module.exports = Column;
