@@ -1,3 +1,4 @@
+// routes/boards.js
 const express = require("express");
 const router = express.Router();
 const boardController = require("../controllers/boardController");
@@ -6,24 +7,32 @@ const auth = require("../middleware/auth");
 //====================
 // Board Routes
 //====================
+
+// GET  /api/boards       → Saare boards fetch karo
+// POST /api/boards       → Naya board banao
 router.get("/", auth, (req, res, next) => {
-  console.log("[Board Router] GET / called by userId:", req.user?.id);
+  console.log("[Board Router] GET / userId:", req.user?.id);
   boardController.getBoards(req, res, next);
 });
 
 router.post("/", auth, (req, res, next) => {
-  console.log(
-    "[Board Router] POST / called by userId:",
-    req.user?.id,
-    "with body:",
-    req.body,
-  );
+  console.log("[Board Router] POST / userId:", req.user?.id, "body:", req.body);
   boardController.createBoard(req, res, next);
 });
 
+//  DELETE /api/boards/all → Reset All (permanent boards safe rahenge)
+// NOTE: Yeh /:id se PEHLE hona chahiye warna "all" ek id ban jayega
+router.delete("/all", auth, (req, res, next) => {
+  console.log("[Board Router] DELETE /all userId:", req.user?.id);
+  boardController.deleteAllBoards(req, res, next);
+});
+
+// GET    /api/boards/:id  → Ek board
+// PUT    /api/boards/:id  → Update board
+// DELETE /api/boards/:id  → Delete ek board
 router.get("/:id", auth, (req, res, next) => {
   console.log(
-    "[Board Router] GET /:id called by userId:",
+    "[Board Router] GET /:id userId:",
     req.user?.id,
     "boardId:",
     req.params.id,
@@ -33,11 +42,11 @@ router.get("/:id", auth, (req, res, next) => {
 
 router.put("/:id", auth, (req, res, next) => {
   console.log(
-    "[Board Router] PUT /:id called by userId:",
+    "[Board Router] PUT /:id userId:",
     req.user?.id,
     "boardId:",
     req.params.id,
-    "with body:",
+    "body:",
     req.body,
   );
   boardController.updateBoard(req, res, next);
@@ -45,7 +54,7 @@ router.put("/:id", auth, (req, res, next) => {
 
 router.delete("/:id", auth, (req, res, next) => {
   console.log(
-    "[Board Router] DELETE /:id called by userId:",
+    "[Board Router] DELETE /:id userId:",
     req.user?.id,
     "boardId:",
     req.params.id,
@@ -54,29 +63,13 @@ router.delete("/:id", auth, (req, res, next) => {
 });
 
 //====================
-// Member management routes
+// Member management
 //====================
 router.post("/:id/members", auth, (req, res, next) => {
-  console.log(
-    "[Board Router] POST /:id/members called by userId:",
-    req.user?.id,
-    "boardId:",
-    req.params.id,
-    "with body:",
-    req.body,
-  );
   boardController.addMember(req, res, next);
 });
 
 router.delete("/:id/members", auth, (req, res, next) => {
-  console.log(
-    "[Board Router] DELETE /:id/members called by userId:",
-    req.user?.id,
-    "boardId:",
-    req.params.id,
-    "with body:",
-    req.body,
-  );
   boardController.removeMember(req, res, next);
 });
 
