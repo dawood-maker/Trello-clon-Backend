@@ -1,3 +1,4 @@
+// routes/auth.js
 const express = require("express");
 const router = express.Router();
 const authController = require("../controllers/authController");
@@ -17,10 +18,7 @@ router.post("/login", (req, res, next) => {
 });
 
 router.post("/forgot-password", (req, res, next) => {
-  console.log(
-    "[Auth Router] POST /forgot-password called with body:",
-    req.body,
-  );
+  console.log("[Auth Router] POST /forgot-password called with body:", req.body);
   authController.forgotPassword(req, res, next);
 });
 
@@ -47,8 +45,14 @@ router.get("/profile", auth, (req, res, next) => {
   authController.getProfile(req, res, next);
 });
 
+// ✅ Profile update karne ka route
+router.put("/profile", auth, (req, res, next) => {
+  console.log("[Auth Router] PUT /profile called by userId:", req.user?.id);
+  authController.updateProfile(req, res, next);
+});
+
 router.post("/logout", (req, res, next) => {
-  console.log("[Auth Router] POST /logout called by userId:", req.user?.id);
+  console.log("[Auth Router] POST /logout called");
   authController.logout(req, res, next);
 });
 

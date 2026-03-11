@@ -29,14 +29,12 @@ transporter.verify((error) => {
 // =================================
 const createInitialColumns = async (boardId, userId) => {
   console.log("📊 Creating initial columns for board:", boardId);
-
   const defaultColumns = [
     { title: "To Do", position: 0 },
     { title: "In Progress", position: 1 },
     { title: "Done", position: 2 },
     { title: "Another Column", position: 3 },
   ];
-
   const columnDocs = defaultColumns.map((col) => ({
     title: col.title,
     board: boardId,
@@ -44,40 +42,30 @@ const createInitialColumns = async (boardId, userId) => {
     owner: userId,
     createdBy: userId,
   }));
-
   const columns = await Column.insertMany(columnDocs);
   console.log(" Columns created:", columns.length);
-
   return columns.map((col) => col._id);
 };
 
 const getPopulatedBoardsForUser = async (userId) => {
   console.log("📦 Fetching boards for user:", userId);
-
   const boards = await Board.find({ owner: userId })
     .sort({ isPermanent: -1, lastActivity: -1 })
     .lean();
-
   console.log("🗂 Boards found:", boards.length);
-
   return await Promise.all(
     boards.map(async (board) => {
-      console.log("➡️ Processing board:", board._id);
-
       const columns = await Column.find({
         _id: { $in: board.columnOrder },
       }).lean();
-
       const columnsWithCards = await Promise.all(
         columns.map(async (column) => {
           const cards = await Card.find({ column: column._id })
             .sort("position")
             .lean();
-          console.log(`📝 Column ${column.title} has ${cards.length} cards`);
           return { ...column, cards };
         }),
       );
-
       const sortedColumns = board.columnOrder
         .map((colId) =>
           columnsWithCards.find(
@@ -85,7 +73,6 @@ const getPopulatedBoardsForUser = async (userId) => {
           ),
         )
         .filter(Boolean);
-
       return { ...board, columns: sortedColumns };
     }),
   );
@@ -137,50 +124,31 @@ const createTestUser = async (req, res) => {
 // =================================
 const register = async (req, res) => {
   console.log("🔥 Register called:", req.body);
-
   try {
     const { name, email, password } = req.body;
-
     if (!name || !email || !password) {
-      console.log(" Missing required fields");
       return res.status(400).json({
         success: false,
         message: "Please provide all required fields",
       });
     }
-
-    console.log("🔎 Checking if user exists...");
     const existingUser = await User.findOne({ email });
-
     if (existingUser) {
-      console.log("⚠️ Email already in use:", email);
-      return res
-        .status(400)
-        .json({ success: false, message: "Email already in use" });
+      return res.status(400).json({ success: false, message: "Email already in use" });
     }
-
-    console.log("🔐 Hashing password...");
     const hashedPassword = await bcrypt.hash(password, 10);
-
-    console.log("👤 Creating user...");
     const user = await User.create({ name, email, password: hashedPassword });
-
-    console.log("🎟 Generating JWT token...");
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
       expiresIn: "7d",
     });
-
     res.cookie("token", token, {
       httpOnly: true,
       maxAge: 7 * 24 * 60 * 60 * 1000,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
     });
-
     const userResponse = user.toObject({ getters: true, virtuals: true });
     delete userResponse.password;
-
-    console.log("📌 Creating permanent board...");
     const board = await Board.create({
       name: "Getting Started",
       color: "#0079BF",
@@ -189,29 +157,20 @@ const register = async (req, res) => {
       isPermanent: true,
       owner: user._id,
     });
-
     const columnIds = await createInitialColumns(board._id, user._id);
     board.columnOrder = columnIds;
     await board.save();
-
-    console.log("🔗 Linking board to user...");
     await User.findByIdAndUpdate(user._id, { $push: { boards: board._id } });
-
     const boardsData = await getPopulatedBoardsForUser(user._id);
-
-    console.log(" Registration complete:", email);
-
     res.status(201).json({
       success: true,
       user: userResponse,
       boards: boardsData,
-      message: "Registration successful! Your permanent board is ready.",
+      message: "Registration successful!",
     });
   } catch (error) {
     console.error(" Register error:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Server error during registration" });
+    res.status(500).json({ success: false, message: "Server error during registration" });
   }
 };
 
@@ -220,58 +179,33 @@ const register = async (req, res) => {
 // =================================
 const login = async (req, res) => {
   console.log("🔥 Login called:", req.body);
-
   try {
     const { email, password } = req.body;
-
     if (!email || !password) {
-      console.log(" Missing email or password");
-      return res
-        .status(400)
-        .json({ success: false, message: "Provide email and password" });
+      return res.status(400).json({ success: false, message: "Provide email and password" });
     }
-
-    console.log("🔎 Finding user...");
     const user = await User.findOne({ email });
-
     if (!user) {
-      console.log(" User not found:", email);
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
+      return res.status(404).json({ success: false, message: "User not found" });
     }
-
-    console.log("🔐 Comparing password...");
     const isMatch = await bcrypt.compare(password, user.password);
-
     if (!isMatch) {
-      console.log(" Invalid credentials for:", email);
-      return res
-        .status(400)
-        .json({ success: false, message: "Invalid credentials" });
+      return res.status(400).json({ success: false, message: "Invalid credentials" });
     }
-
-    console.log("🎟 Generating token...");
     const token = jwt.sign({ id: user._id }, process.env.JWT_SECRET, {
       expiresIn: "7d",
     });
-
     res.cookie("token", token, {
       httpOnly: true,
       maxAge: 7 * 24 * 60 * 60 * 1000,
       secure: process.env.NODE_ENV === "production",
       sameSite: "strict",
     });
-
     const userResponse = await User.findById(user._id).select(
       "-password -otp -otpExpiry",
     );
-
-    console.log("📦 Fetching boards...");
     let boardsData = await getPopulatedBoardsForUser(user._id);
-
     if (boardsData.length === 0) {
-      console.log("📌 No boards found. Creating permanent board...");
       const board = await Board.create({
         name: "Getting Started",
         color: "#0079BF",
@@ -286,9 +220,7 @@ const login = async (req, res) => {
       await User.findByIdAndUpdate(user._id, { $push: { boards: board._id } });
       boardsData = await getPopulatedBoardsForUser(user._id);
     }
-
     console.log(" Login successful:", email);
-
     res.json({
       success: true,
       user: userResponse,
@@ -297,9 +229,7 @@ const login = async (req, res) => {
     });
   } catch (error) {
     console.error(" Login error:", error);
-    res
-      .status(500)
-      .json({ success: false, message: "Server error during login" });
+    res.status(500).json({ success: false, message: "Server error during login" });
   }
 };
 
@@ -317,46 +247,25 @@ const logout = (req, res) => {
 // =================================
 const forgotPassword = async (req, res) => {
   console.log("🔐 Forgot password called:", req.body);
-
   try {
     const { email } = req.body;
-
     if (!email)
       return res.status(400).json({ success: false, message: "Provide email" });
-
     const user = await User.findOne({ email });
-
     if (!user)
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
-
-    console.log("🔢 Generating OTP...");
+      return res.status(404).json({ success: false, message: "User not found" });
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-
     user.otp = otp;
     user.otpExpiry = Date.now() + 2 * 60 * 1000;
     await user.save();
-
     const emailSent = await sendEmail(
       email,
       "🔐 Password Reset OTP",
       `<p>Your OTP: <strong>${otp}</strong></p><p>Expires in 2 minutes.</p>`,
     );
-
     if (!emailSent)
-      return res
-        .status(500)
-        .json({ success: false, message: "Failed to send email" });
-
-    console.log(" OTP sent to:", email);
-
-    res.json({
-      success: true,
-      message: "OTP sent!",
-      email,
-      expiresIn: "2 minutes",
-    });
+      return res.status(500).json({ success: false, message: "Failed to send email" });
+    res.json({ success: true, message: "OTP sent!", email, expiresIn: "2 minutes" });
   } catch (error) {
     console.error(" Forgot password error:", error);
     res.status(500).json({ success: false, message: "Server error" });
@@ -368,38 +277,23 @@ const forgotPassword = async (req, res) => {
 // =================================
 const verifyOTP = async (req, res) => {
   console.log("🔎 Verify OTP called:", req.body);
-
   try {
     const { email, otp } = req.body;
-
     if (!email || !otp)
-      return res
-        .status(400)
-        .json({ success: false, message: "Provide email and OTP" });
-
+      return res.status(400).json({ success: false, message: "Provide email and OTP" });
     const user = await User.findOne({ email });
-
     if (!user)
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
-
+      return res.status(404).json({ success: false, message: "User not found" });
     if (!user.otp || !user.otpExpiry)
       return res.status(400).json({ success: false, message: "No OTP found" });
-
     if (Date.now() > user.otpExpiry) {
-      console.log("⏰ OTP expired");
       user.otp = undefined;
       user.otpExpiry = undefined;
       await user.save();
       return res.status(400).json({ success: false, message: "OTP expired" });
     }
-
     if (user.otp !== otp)
       return res.status(400).json({ success: false, message: "Invalid OTP" });
-
-    console.log(" OTP verified for:", email);
-
     res.json({ success: true, message: "OTP verified!", email });
   } catch (error) {
     console.error(" Verify OTP error:", error);
@@ -412,47 +306,29 @@ const verifyOTP = async (req, res) => {
 // =================================
 const resetPassword = async (req, res) => {
   console.log(" Reset password called:", req.body);
-
   try {
     const { email, otp, newPassword } = req.body;
-
     if (!email || !otp || !newPassword)
-      return res
-        .status(400)
-        .json({ success: false, message: "All fields required" });
-
+      return res.status(400).json({ success: false, message: "All fields required" });
     if (newPassword.length < 6)
       return res.status(400).json({ success: false, message: "Min 6 chars" });
-
     const user = await User.findOne({ email });
-
     if (!user)
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
-
+      return res.status(404).json({ success: false, message: "User not found" });
     if (!user.otp || !user.otpExpiry)
       return res.status(400).json({ success: false, message: "No OTP" });
-
     if (Date.now() > user.otpExpiry) {
-      console.log("⏰ OTP expired during reset");
       user.otp = undefined;
       user.otpExpiry = undefined;
       await user.save();
       return res.status(400).json({ success: false, message: "OTP expired" });
     }
-
     if (user.otp !== otp)
       return res.status(400).json({ success: false, message: "Invalid OTP" });
-
-    console.log("🔐 Updating password...");
     user.password = await bcrypt.hash(newPassword, 10);
     user.otp = undefined;
     user.otpExpiry = undefined;
     await user.save();
-
-    console.log(" Password reset successful for:", email);
-
     res.json({ success: true, message: "Password reset!" });
   } catch (error) {
     console.error(" Reset password error:", error);
@@ -465,17 +341,12 @@ const resetPassword = async (req, res) => {
 // =================================
 const getProfile = async (req, res) => {
   console.log(" Get profile called:", req.user?.id);
-
   try {
     const user = await User.findById(req.user.id).select(
       "-password -otp -otpExpiry",
     );
-
     if (!user)
-      return res
-        .status(404)
-        .json({ success: false, message: "User not found" });
-
+      return res.status(404).json({ success: false, message: "User not found" });
     res.json({ success: true, user });
   } catch (error) {
     console.error(" Get profile error:", error);
@@ -483,21 +354,37 @@ const getProfile = async (req, res) => {
   }
 };
 
+// ✅ UPDATED: name, gender, profilePicture update karta hai
 const updateProfile = async (req, res) => {
   console.log("✏️ Update profile called:", req.body);
+  console.log("✏️ User ID:", req.user?.id);
 
   try {
-    const { name, email } = req.body;
+    const { name, gender, profilePicture } = req.body;
+
+    const updateData = {};
+    if (name && name.trim()) updateData.name = name.trim();
+    if (gender && ["male", "female", "other"].includes(gender)) {
+      updateData.gender = gender;
+    }
+    if (profilePicture !== undefined) {
+      updateData.profilePicture = profilePicture;
+    }
+
+    console.log("✏️ Update data:", updateData);
 
     const user = await User.findByIdAndUpdate(
       req.user.id,
-      { name, email },
+      updateData,
       { new: true },
     ).select("-password -otp -otpExpiry");
 
-    console.log(" Profile updated");
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
 
-    res.json({ success: true, user, message: "Profile updated" });
+    console.log(" Profile updated for:", user.email);
+    res.json({ success: true, user, message: "Profile updated successfully" });
   } catch (error) {
     console.error(" Update profile error:", error);
     res.status(500).json({ success: false, message: "Server error" });
@@ -506,24 +393,15 @@ const updateProfile = async (req, res) => {
 
 const changePassword = async (req, res) => {
   console.log("🔑 Change password called");
-
   try {
     const { currentPassword, newPassword } = req.body;
-
     const user = await User.findById(req.user.id);
-
     const isMatch = await bcrypt.compare(currentPassword, user.password);
-
     if (!isMatch)
-      return res
-        .status(400)
-        .json({ success: false, message: "Current password incorrect" });
-
+      return res.status(400).json({ success: false, message: "Current password incorrect" });
     user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
-
     console.log(" Password changed successfully");
-
     res.json({ success: true, message: "Password changed" });
   } catch (error) {
     console.error(" Change password error:", error);

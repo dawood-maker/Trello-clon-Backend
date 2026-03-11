@@ -12,9 +12,17 @@ const userSchema = new mongoose.Schema(
       trim: true,
     },
     password: { type: String, required: true, minlength: 6 },
-    //============================
-    // OTP fields - UPDATED NAMES (matching controller)
-    //============================
+
+    // ✅ NAYA: Profile picture (Google ya upload ki hui)
+    profilePicture: { type: String, default: null },
+
+    // ✅ NAYA: Gender field
+    gender: {
+      type: String,
+      enum: ["male", "female", "other"],
+      default: "male",
+    },
+
     otp: { type: String, default: null },
     otpExpiry: { type: Date, default: null },
     isVerified: { type: Boolean, default: true },
@@ -23,17 +31,11 @@ const userSchema = new mongoose.Schema(
   { timestamps: true },
 );
 
-//============================
-// Middleware for logging saves
-//============================
 userSchema.pre("save", function (next) {
   console.log(`[User] Saving user: id=${this._id}, email=${this.email}`);
   next();
 });
 
-//============================
-// Middleware for logging updates
-//============================
 userSchema.pre("updateOne", function (next) {
   console.log(`[User] updateOne called with filter:`, this.getFilter());
   next();
@@ -44,9 +46,6 @@ userSchema.pre("findOneAndUpdate", function (next) {
   next();
 });
 
-//============================
-// Middleware for logging deletions
-//============================
 userSchema.pre("deleteOne", { document: true, query: false }, function (next) {
   console.log(`[User] deleteOne called for user id=${this._id}`);
   next();
@@ -62,8 +61,5 @@ userSchema.pre("deleteMany", function (next) {
   next();
 });
 
-//============================
-// Prevent OverwriteModelError
-//============================
 const User = mongoose.models.User || mongoose.model("User", userSchema);
 module.exports = User;
