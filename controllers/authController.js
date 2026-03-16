@@ -1,232 +1,246 @@
-import React, { createContext, useContext, useState } from "react";
+const User = require("../models/User");
+const bcrypt = require("bcryptjs");
+const jwt = require("jsonwebtoken");
+const crypto = require("crypto");
 
-const AuthContext = createContext();
+const JWT_SECRET = process.env.JWT_SECRET || "your_jwt_secret";
+const JWT_EXPIRES = process.env.JWT_EXPIRES || "7d";
 
-export const AuthProvider = ({ children }) => {
-  const API_URL = "http://localhost:5002/api";
-  const [user, setUser] = useState(
-    JSON.parse(localStorage.getItem("user")) || null,
-  );
-  const [isAuthenticated, setIsAuthenticated] = useState(!!user);
-  const [error, setError] = useState(null);
+// OTP store (simple in-memory, production mein Redis use karo)
+const otpStore = {};
 
-  const clearError = () => setError(null);
+//===================================
+// ------------------ REGISTER ------------------
+//===================================
+const register = async (req, res) => {
+  try {
+    const { name, email, password } = req.body;
 
-  //===================================
-  // ------------------ REGISTER ------------------
-  //===================================
-  const register = async (name, email, password) => {
-    console.log("Register called with:", { name, email, password });
-    try {
-      const res = await fetch(`${API_URL}/auth/register`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ name, email, password }),
-      });
-      const data = await res.json();
-      console.log("Register response:", data);
+    if (!name || !email || !password)
+      return res.status(400).json({ success: false, message: "All fields are required" });
 
-      if (data.success) {
-        localStorage.setItem("user", JSON.stringify(data.user));
-        setUser(data.user);
-        setIsAuthenticated(true);
-        setError(null);
-      } else {
-        setError(data.message || "Registration failed");
-      }
+    const existingUser = await User.findOne({ email });
+    if (existingUser)
+      return res.status(400).json({ success: false, message: "Email already registered" });
 
-      return data;
-    } catch (err) {
-      console.error("Register frontend error:", err);
-      setError("Network error. Please try again.");
-      return { success: false, message: err.message };
-    }
-  };
+    const hashedPassword = await bcrypt.hash(password, 10);
 
-  //===================================
-  // ------------------ LOGIN ------------------
-  //===================================
-  const login = async (email, password) => {
-    console.log("Login called with:", { email, password });
-    try {
-      const res = await fetch(`${API_URL}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ email, password }),
-      });
-      const data = await res.json();
-      console.log("Login response:", data);
+    const user = await User.create({ name, email, password: hashedPassword });
 
-      if (data.success) {
-        localStorage.setItem("user", JSON.stringify(data.user));
-        setUser(data.user);
-        setIsAuthenticated(true);
-        setError(null);
-      } else {
-        setError(data.message || "Login failed");
-      }
+    const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
 
-      return data;
-    } catch (err) {
-      console.error("Login frontend error:", err);
-      setError("Network error. Please try again.");
-      return { success: false, message: err.message };
-    }
-  };
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
 
-  //===================================
-  // ------------------ LOGOUT ------------------
-  //===================================
-  const logout = async () => {
-    console.log("Logout called");
-    try {
-      await fetch(`${API_URL}/auth/logout`, {
-        method: "POST",
-        credentials: "include",
-      });
-    } catch (err) {
-      console.error("Logout error:", err);
-    } finally {
-      console.log("Clearing local user data");
-      localStorage.removeItem("user");
-      setUser(null);
-      setIsAuthenticated(false);
-      setError(null);
-    }
-  };
-
-  //===================================
-  // ------------------ UPDATE PROFILE ------------------
-  // ✅ NAYA: Profile picture, name, gender update karta hai
-  //===================================
-  const updateProfile = async ({ name, gender, profilePicture }) => {
-    console.log("UpdateProfile called with:", { name, gender, profilePicture: profilePicture ? "base64 image" : null });
-    try {
-      const res = await fetch(`${API_URL}/auth/profile`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ name, gender, profilePicture }),
-      });
-      const data = await res.json();
-      console.log("UpdateProfile response:", data);
-
-      if (data.success) {
-        // ✅ User state aur localStorage dono update karo
-        const updatedUser = { ...user, ...data.user };
-        localStorage.setItem("user", JSON.stringify(updatedUser));
-        setUser(updatedUser);
-        setError(null);
-      } else {
-        setError(data.message || "Profile update failed");
-      }
-
-      return data;
-    } catch (err) {
-      console.error("UpdateProfile frontend error:", err);
-      setError("Network error. Please try again.");
-      return { success: false, message: err.message };
-    }
-  };
-
-  //===================================
-  // ------------------ FORGOT PASSWORD ------------------
-  //===================================
-  const forgotPassword = async (email) => {
-    console.log("ForgotPassword called with:", { email });
-    try {
-      setError(null);
-      const res = await fetch(`${API_URL}/auth/forgot-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
-      const data = await res.json();
-      console.log("ForgotPassword response:", data);
-      if (!data.success) setError(data.message || "Failed to send OTP");
-      return data;
-    } catch (err) {
-      console.error("Forgot password error:", err);
-      setError("Network error. Please try again.");
-      return { success: false, message: err.message };
-    }
-  };
-
-  //===================================
-  // ------------------ VERIFY OTP ------------------
-  //===================================
-  const verifyOTP = async (email, otp) => {
-    console.log("VerifyOTP called with:", { email, otp });
-    try {
-      setError(null);
-      const res = await fetch(`${API_URL}/auth/verify-otp`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, otp }),
-      });
-      const data = await res.json();
-      console.log("VerifyOTP response:", data);
-      if (!data.success) setError(data.message || "Invalid OTP");
-      return data;
-    } catch (err) {
-      console.error("Verify OTP error:", err);
-      setError("Network error. Please try again.");
-      return { success: false, message: err.message };
-    }
-  };
-
-  //===================================
-  // ------------------ RESET PASSWORD ------------------
-  //===================================
-  const resetPassword = async (email, otp, newPassword) => {
-    console.log("ResetPassword called with:", { email, otp, newPassword });
-    try {
-      setError(null);
-      const res = await fetch(`${API_URL}/auth/reset-password`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, otp, newPassword }),
-      });
-      const data = await res.json();
-      console.log("ResetPassword response:", data);
-      if (!data.success) setError(data.message || "Failed to reset password");
-      return data;
-    } catch (err) {
-      console.error("Reset password error:", err);
-      setError("Network error. Please try again.");
-      return { success: false, message: err.message };
-    }
-  };
-
-  // Legacy support
-  const updatePassword = resetPassword;
-
-  return (
-    <AuthContext.Provider
-      value={{
-        user,
-        setUser,
-        isAuthenticated,
-        register,
-        login,
-        logout,
-        updateProfile,       // ✅ NAYA — ProfileModal use karta hai
-        forgotPassword,
-        verifyOTP,
-        resetPassword,
-        updatePassword,
-        error,
-        clearError,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
-  );
+    return res.status(201).json({
+      success: true,
+      message: "Registration successful",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        gender: user.gender || null,
+        profilePicture: user.profilePicture || null,
+      },
+    });
+  } catch (err) {
+    console.error("Register error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
 };
 
 //===================================
-// Custom hook
+// ------------------ LOGIN ------------------
 //===================================
-export const useAuth = () => useContext(AuthContext);
+const login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password)
+      return res.status(400).json({ success: false, message: "All fields are required" });
+
+    const user = await User.findOne({ email });
+    if (!user)
+      return res.status(400).json({ success: false, message: "Invalid email or password" });
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch)
+      return res.status(400).json({ success: false, message: "Invalid email or password" });
+
+    const token = jwt.sign({ id: user._id }, JWT_SECRET, { expiresIn: JWT_EXPIRES });
+
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Login successful",
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        gender: user.gender || null,
+        profilePicture: user.profilePicture || null,
+      },
+    });
+  } catch (err) {
+    console.error("Login error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+//===================================
+// ------------------ LOGOUT ------------------
+//===================================
+const logout = async (req, res) => {
+  try {
+    res.clearCookie("token");
+    return res.status(200).json({ success: true, message: "Logged out successfully" });
+  } catch (err) {
+    console.error("Logout error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+//===================================
+// ------------------ UPDATE PROFILE ------------------
+//===================================
+const updateProfile = async (req, res) => {
+  try {
+    const { name, gender, profilePicture } = req.body;
+    const userId = req.user?.id;
+
+    if (!userId)
+      return res.status(401).json({ success: false, message: "Unauthorized" });
+
+    const updatedUser = await User.findByIdAndUpdate(
+      userId,
+      { name, gender, profilePicture },
+      { new: true, runValidators: true }
+    );
+
+    if (!updatedUser)
+      return res.status(404).json({ success: false, message: "User not found" });
+
+    return res.status(200).json({
+      success: true,
+      message: "Profile updated successfully",
+      user: {
+        id: updatedUser._id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        gender: updatedUser.gender || null,
+        profilePicture: updatedUser.profilePicture || null,
+      },
+    });
+  } catch (err) {
+    console.error("UpdateProfile error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+//===================================
+// ------------------ FORGOT PASSWORD ------------------
+//===================================
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email)
+      return res.status(400).json({ success: false, message: "Email is required" });
+
+    const user = await User.findOne({ email });
+    if (!user)
+      return res.status(404).json({ success: false, message: "No user found with this email" });
+
+    // 6-digit OTP generate karo
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+    otpStore[email] = { otp, expiresAt: Date.now() + 10 * 60 * 1000 }; // 10 min expiry
+
+    // TODO: Yahan nodemailer se OTP email karo
+    console.log(`OTP for ${email}: ${otp}`);
+
+    return res.status(200).json({ success: true, message: "OTP sent to email" });
+  } catch (err) {
+    console.error("ForgotPassword error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+//===================================
+// ------------------ VERIFY OTP ------------------
+//===================================
+const verifyOTP = async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+
+    if (!email || !otp)
+      return res.status(400).json({ success: false, message: "Email and OTP are required" });
+
+    const record = otpStore[email];
+    if (!record)
+      return res.status(400).json({ success: false, message: "OTP not found. Please request again." });
+
+    if (Date.now() > record.expiresAt)
+      return res.status(400).json({ success: false, message: "OTP has expired" });
+
+    if (record.otp !== otp)
+      return res.status(400).json({ success: false, message: "Invalid OTP" });
+
+    return res.status(200).json({ success: true, message: "OTP verified successfully" });
+  } catch (err) {
+    console.error("VerifyOTP error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+//===================================
+// ------------------ RESET PASSWORD ------------------
+//===================================
+const resetPassword = async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+
+    if (!email || !otp || !newPassword)
+      return res.status(400).json({ success: false, message: "All fields are required" });
+
+    const record = otpStore[email];
+    if (!record)
+      return res.status(400).json({ success: false, message: "OTP not found. Please request again." });
+
+    if (Date.now() > record.expiresAt)
+      return res.status(400).json({ success: false, message: "OTP has expired" });
+
+    if (record.otp !== otp)
+      return res.status(400).json({ success: false, message: "Invalid OTP" });
+
+    const hashedPassword = await bcrypt.hash(newPassword, 10);
+    await User.findOneAndUpdate({ email }, { password: hashedPassword });
+
+    // OTP use hone ke baad delete karo
+    delete otpStore[email];
+
+    return res.status(200).json({ success: true, message: "Password reset successfully" });
+  } catch (err) {
+    console.error("ResetPassword error:", err);
+    return res.status(500).json({ success: false, message: "Server error" });
+  }
+};
+
+module.exports = {
+  register,
+  login,
+  logout,
+  updateProfile,
+  forgotPassword,
+  verifyOTP,
+  resetPassword,
+};
