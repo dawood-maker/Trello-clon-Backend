@@ -31,7 +31,7 @@ const columnController = {
       board.lastActivity = Date.now();
       await board.save();
 
-      console.log("✅ Column created successfully:", column._id);
+      console.log(". Column created successfully:", column._id);
       res.status(201).json({ success: true, column });
     } catch (err) {
       console.error("Create column error:", err);
@@ -59,7 +59,7 @@ const columnController = {
         .sort("position")
         .lean();
 
-      console.log("✅ Columns fetched:", columns.length);
+      console.log(". Columns fetched:", columns.length);
       res.json({ success: true, columns });
     } catch (err) {
       console.error("Get columns error:", err);
@@ -88,7 +88,7 @@ const columnController = {
           });
       }
 
-      console.log("✅ Column found:", column._id);
+      console.log(". Column found:", column._id);
       res.json({ success: true, column });
     } catch (err) {
       console.error("Get column error:", err);
@@ -134,7 +134,7 @@ const columnController = {
       await column.save();
       await Board.findByIdAndUpdate(column.board, { lastActivity: Date.now() });
 
-      console.log("✅ Column updated:", column._id);
+      console.log(". Column updated:", column._id);
       res.json({ success: true, column });
     } catch (err) {
       console.error("Update column error:", err);
@@ -170,7 +170,7 @@ const columnController = {
       await Card.deleteMany({ column: column._id, owner: req.user.id });
       await Column.findByIdAndDelete(req.params.id);
 
-      console.log("✅ Column deleted:", column._id);
+      console.log(". Column deleted:", column._id);
       res.json({ success: true, message: "Column deleted" });
     } catch (err) {
       console.error("Delete column error:", err);
@@ -207,7 +207,7 @@ const columnController = {
       await Board.findByIdAndUpdate(column.board, { lastActivity: Date.now() });
 
       console.log(
-        "✅ Column position updated:",
+        ". Column position updated:",
         column._id,
         "New position:",
         position,
@@ -271,7 +271,7 @@ const columnController = {
       column.position = position;
       await column.save();
 
-      console.log("✅ Column moved successfully:", column._id);
+      console.log(". Column moved successfully:", column._id);
       res.json({ success: true, column });
     } catch (err) {
       console.error("Move column error:", err);
@@ -310,7 +310,7 @@ const columnController = {
         isCompleted: true,
       });
 
-      console.log("✅ Column stats:", {
+      console.log(". Column stats:", {
         cardsCount,
         completedCount,
         pendingCount: cardsCount - completedCount,
@@ -381,10 +381,10 @@ const columnController = {
           priority: card.priority,
         }));
         await Card.insertMany(duplicatedCards);
-        console.log("✅ Cards duplicated:", duplicatedCards.length);
+        console.log(". Cards duplicated:", duplicatedCards.length);
       }
 
-      console.log("✅ Column duplicated successfully:", newColumn._id);
+      console.log(". Column duplicated successfully:", newColumn._id);
       res.json({ success: true, column: newColumn });
     } catch (err) {
       console.error("Duplicate column error:", err);

@@ -13,10 +13,10 @@ const userSchema = new mongoose.Schema(
     },
     password: { type: String, required: true, minlength: 6 },
 
-    // ✅ NAYA: Profile picture (Google ya upload ki hui)
+    // . NAYA: Profile picture (Google ya upload ki hui)
     profilePicture: { type: String, default: null },
 
-    // ✅ NAYA: Gender field
+    // . NAYA: Gender field
     gender: {
       type: String,
       enum: ["male", "female", "other"],

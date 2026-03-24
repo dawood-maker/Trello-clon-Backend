@@ -33,7 +33,7 @@ exports.sendOTP = async (req, res) => {
     user.otpExpiry = otpExpiry;
     await user.save();
 
-    console.log(`✅ OTP generated for ${email}: ${otp} (expires in 10 mins)`);
+    console.log(`. OTP generated for ${email}: ${otp} (expires in 10 mins)`);
 
     // Send email
     const emailSent = await sendEmail(
@@ -56,7 +56,7 @@ exports.sendOTP = async (req, res) => {
     );
 
     if (emailSent) {
-      console.log("✅ OTP email sent successfully:", email);
+      console.log(". OTP email sent successfully:", email);
     } else {
       console.log("⚠️ Failed to send OTP email:", email);
     }
@@ -109,7 +109,7 @@ exports.verifyOTP = async (req, res) => {
         .json({ success: false, message: "OTP has expired" });
     }
 
-    console.log("✅ OTP verified successfully for:", email);
+    console.log(". OTP verified successfully for:", email);
     res.json({ success: true, message: "OTP verified successfully" });
   } catch (error) {
     console.error("❌ Verify OTP Error:", error.message);

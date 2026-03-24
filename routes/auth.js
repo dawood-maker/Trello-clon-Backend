@@ -45,7 +45,7 @@ router.get("/profile", auth, (req, res, next) => {
   authController.getProfile(req, res, next);
 });
 
-// ✅ Profile update karne ka route
+// . Profile update karne ka route
 router.put("/profile", auth, (req, res, next) => {
   console.log("[Auth Router] PUT /profile called by userId:", req.user?.id);
   authController.updateProfile(req, res, next);

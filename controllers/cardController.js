@@ -65,7 +65,7 @@ const cardController = {
         lastActivity: Date.now(),
       });
 
-      console.log("✅ Card created successfully:", card._id);
+      console.log(". Card created successfully:", card._id);
       res.status(201).json({ success: true, card });
     } catch (err) {
       console.error("Create card error:", err);
@@ -100,7 +100,7 @@ const cardController = {
         .populate("assignedTo", "name email")
         .sort("position");
 
-      console.log("✅ Cards fetched:", cards.length);
+      console.log(". Cards fetched:", cards.length);
       res.json({ success: true, cards });
     } catch (err) {
       console.error("Get cards error:", err);
@@ -131,7 +131,7 @@ const cardController = {
           .json({ success: false, message: "Card not found or unauthorized" });
       }
 
-      console.log("✅ Card found:", card._id);
+      console.log(". Card found:", card._id);
       res.json({ success: true, card });
     } catch (err) {
       console.error("Get card error:", err);
@@ -188,7 +188,7 @@ const cardController = {
         lastActivity: Date.now(),
       });
 
-      console.log("✅ Card updated:", card._id);
+      console.log(". Card updated:", card._id);
       res.json({ success: true, card });
     } catch (err) {
       console.error("Update card error:", err);
@@ -220,7 +220,7 @@ const cardController = {
         lastActivity: Date.now(),
       });
 
-      console.log("✅ Card deleted:", card._id);
+      console.log(". Card deleted:", card._id);
       res.json({ success: true, message: "Card deleted" });
     } catch (err) {
       console.error("Delete card error:", err);
@@ -329,7 +329,7 @@ const cardController = {
         lastActivity: Date.now(),
       });
 
-      console.log("✅ Card moved successfully:", card._id);
+      console.log(". Card moved successfully:", card._id);
       res.json({ success: true, card });
     } catch (err) {
       console.error("Move card error:", err);
@@ -373,7 +373,7 @@ const cardController = {
       }));
 
       await Card.bulkWrite(bulkOps);
-      console.log("✅ Cards positions updated successfully");
+      console.log(". Cards positions updated successfully");
       res.json({ success: true, message: "Cards positions updated" });
     } catch (err) {
       console.error("Update cards position error:", err);
@@ -402,7 +402,7 @@ const cardController = {
       console.log("🔹 Previous completion state:", card.isCompleted);
       card.toggleCompletion();
       await card.save();
-      console.log("✅ New completion state:", card.isCompleted);
+      console.log(". New completion state:", card.isCompleted);
 
       res.json({ success: true, card });
     } catch (err) {
@@ -448,7 +448,7 @@ const cardController = {
         priority: card.priority,
       });
 
-      console.log("✅ Card duplicated successfully:", newCard._id);
+      console.log(". Card duplicated successfully:", newCard._id);
       res.json({ success: true, card: newCard });
     } catch (err) {
       console.error("Duplicate card error:", err);
